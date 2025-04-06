@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en_US">
+<head>
+  <title>C2 Dashboard</title>
+  <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+  <script src="https://unpkg.com/htmx.org@1.9.5"></script>
+  <script>
+    const socket = io();
+    socket.on("connect", () => console.log("[*] WebSocket connected"));
+  </script>
+  <meta charset="UTF-8">
+  <style>
+    body { background: #111; color: #0f0; font-family: monospace; padding: 20px; }
+    .box { border: 1px solid #0f0; margin: 1em 0; padding: 10px; }
+    input[type="text"] { background: #000; color: #0f0; border: 1px solid #0f0; padding: 4px; width: 70%; }
+    button { background: #0f0; color: #000; padding: 5px 10px; border: none; }
+  </style>
+</head>
+<body>
+  <h1>🕵️ C2 Dashboard</h1>
+
+  <form hx-post="/clean" hx-swap="outerHTML" hx-target="#clear-status" style="margin-bottom: 2em;"
+        hx-on::after-request="window.location.reload()">
+    <button type="submit" style="background: red; color: white; padding: 10px; border: none;">
+      🧼 Clear All (Stale Agents + Tasks + Results)
+    </button>
+    <span id="clear-status" style="margin-left: 1em;"></span>
+  </form>
+
+  <h2>Agents</h2>
+  {% for a in agents %}
+    <div class="box">
+      ID: {{ a[0] }}<br>Host: {{ a[2] }}<br>IP: {{ a[1] }}<br>Last seen: {{ a[4] }}
+      <form method="POST" action="/task/{{ a[0] }}" class="command-form">
+        <input type="text" name="command" placeholder="Enter command..." required />
+        <button type="submit">Send</button>
+      </form>
+    </div>
+  {% endfor %}
+
+  <h2>Recent Results</h2>
+  {% for r in results %}
+    <div class="box">
+      Agent: {{ r[1] }}<br>
+      <pre>{{ r[2] }}</pre>
+      Time: {{ r[3] }}
+    </div>
+  {% endfor %}
+
+  <script>
+    socket.on("new_result", data => {
+      const resultBox = document.createElement("div");
+      resultBox.classList.add("box");
+      resultBox.innerHTML = `
+        <strong>Agent:</strong> ${data.agent_id}<br>
+        <pre>${data.output}</pre>
+        <small>Time: ${data.timestamp}</small>
+      `;
+      document.body.appendChild(resultBox);
+    });
+
+    socket.on("new_agent", agent => {
+      const box = document.createElement("div");
+      box.classList.add("box");
+      box.innerHTML = `
+        <strong>Agent:</strong> ${agent.hostname} (${agent.ip})<br>
+        ID: ${agent.agent_id}<br>
+        Last seen: ${agent.last_seen}<br><br>
+        <form method="POST" action="/task/${agent.agent_id}" class="command-form">
+            <input type="text" name="command" placeholder="Enter command..." required>
+            <button type="submit">Send</button>
+        </form>
+      `;
+      const header = document.querySelector("h2");
+      header.insertAdjacentElement("afterend", box);
+    });
+  </script>
+  <script>
+    document.body.addEventListener('submit', function(event) {
+      if (event.target && event.target.classList.contains('command-form')) {
+        event.preventDefault(); // Prevent the default form submission
+        const form = event.target;
+        const formData = new FormData(form);
+        const action = form.getAttribute('action');
+
+        fetch(action, {
+          method: 'POST',
+          body: formData,
+        })
+        .then(response => {
+          if (response.ok) {
+            form.reset(); // Reset the form fields on successful submission
+          } else {
+            // Handle errors if needed
+            console.error('Form submission failed');
+          }
+        })
+        .catch(error => {
+          console.error('Error submitting form:', error);
+        });
+      }
+    });
+  </script>
+</body>
+</html>
