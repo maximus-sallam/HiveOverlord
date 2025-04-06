@@ -51,6 +51,7 @@ Copy zombie.py manually to the target system using a USB drive.
 Ensure Python 3 is installed:
 ```
 $ python3 --version
+Python 3.13.2
 ```
 
 If not installed, refer to the target system's OS-specific instructions to install Python 3.
